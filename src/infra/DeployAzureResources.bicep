@@ -19,6 +19,14 @@ var webAppSku = 'S1'
 var registryName = '${uniqueString(resourceGroup().id)}cosureg'
 var registrySku = 'Standard'
 
+var tags = {
+  Project: 'Tech Workshop L300 - AI Apps and Agents'
+  Environment: 'Lab'
+  Owner: deployer().userPrincipalName
+  SecurityControl: 'ignore'
+  CostControl: 'ignore'
+}
+
 // Ensure the current resource group has the required tag via a subscription-scoped module
 module updateRgTags 'updateRgTags.bicep' = {
   name: 'updateRgTags'
@@ -26,7 +34,7 @@ module updateRgTags 'updateRgTags.bicep' = {
   params: {
     rgName: resourceGroup().name
     rgLocation: resourceGroup().location
-    newTags: union(resourceGroup().tags ?? {}, { SecurityControl: 'Ignore' })
+    newTags: union(resourceGroup().tags ?? {}, tags )
   }
 }
 
@@ -59,6 +67,7 @@ resource cosmosDbAccount 'Microsoft.DocumentDB/databaseAccounts@2023-04-15' = {
     locations: locations
     disableLocalAuth: false
   }
+  tags: tags
 }
 
 @description('Creates an Azure Cosmos DB NoSQL API database.')
@@ -70,6 +79,7 @@ resource cosmosDbDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@20
       id: cosmosDbDatabaseName
     }
   }
+  tags: tags
 }
 
 @description('Creates an Azure Storage account.')
@@ -83,6 +93,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   properties: {
     accessTier: 'Hot'
   }
+  tags: tags
 }
 
 resource aiFoundry 'Microsoft.CognitiveServices/accounts@2025-10-01-preview' = {
@@ -105,6 +116,7 @@ resource aiFoundry 'Microsoft.CognitiveServices/accounts@2025-10-01-preview' = {
     disableLocalAuth: false
     publicNetworkAccess: 'Enabled'
   }
+  tags: tags
 }
 
 /*
@@ -120,6 +132,7 @@ resource aiProject 'Microsoft.CognitiveServices/accounts/projects@2025-10-01-pre
     type: 'SystemAssigned'
   }
   properties: {}
+  tags: tags
 }
 
 @description('Creates an Azure Log Analytics workspace.')
@@ -135,6 +148,7 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09
       dailyQuotaGb: 1
     }
   }
+  tags: tags
 }
 
 @description('Creates an Azure Application Insights resource.')
@@ -146,6 +160,7 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02-preview' = {
     Application_Type: 'web'
     WorkspaceResourceId: logAnalyticsWorkspace.id
   }
+  tags: tags
 }
 
 @description('Creates an Azure Container Registry.')
@@ -158,6 +173,7 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2022-12-01' =
   properties: {
     adminUserEnabled: true
   }
+  tags: tags
 }
 
 @description('Creates an Azure App Service Plan.')
@@ -171,6 +187,7 @@ resource appServicePlan 'Microsoft.Web/serverFarms@2022-09-01' = {
   sku: {
     name: webAppSku
   }
+  tags: tags
 }
 
 @description('Creates an Azure App Service for Zava.')
@@ -186,14 +203,13 @@ resource appServiceApp 'Microsoft.Web/sites@2022-09-01' = {
       http20Enabled: true
       minTlsVersion: '1.2'
       appCommandLine: ''
-      appSettings: [
-        {
+      appSettings: [{
           name: 'WEBSITES_ENABLE_APP_SERVICE_STORAGE'
           value: 'false'
         }
         {
           name: 'DOCKER_REGISTRY_SERVER_URL'
-          value: 'https://${containerRegistry.name}.azurecr.io'
+          value: 'https://${containerRegistry.name}${environment().suffixes.acr}'
         }
         {
           name: 'DOCKER_REGISTRY_SERVER_USERNAME'
@@ -206,10 +222,10 @@ resource appServiceApp 'Microsoft.Web/sites@2022-09-01' = {
         {
           name: 'APPINSIGHTS_INSTRUMENTATIONKEY'
           value: appInsights.properties.InstrumentationKey
-        }
-        ]
-      }
+      }]
     }
+  }
+  tags: tags
 }
 
 // Cosmos DB built-in data plane role IDs
