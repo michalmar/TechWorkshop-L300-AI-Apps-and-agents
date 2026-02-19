@@ -87,7 +87,8 @@ def get_request_embedding(text: str) -> list[float] | None:
         logger.error("Embedding env vars not fully set; failing embedding generation.")
         return None
 
-    url = EMBEDDING_ENDPOINT.rstrip("/") + f"/openai/deployments/{EMBEDDING_DEPLOYMENT}/embeddings?api-version={EMBEDDING_API_VERSION}"
+    base_url = EMBEDDING_ENDPOINT.rstrip("/")
+    url = base_url + f"/openai/deployments/{EMBEDDING_DEPLOYMENT}/embeddings?api-version={EMBEDDING_API_VERSION}"
     headers = {
         "Content-Type": "application/json",
         "api-key": EMBEDDING_API_KEY,
@@ -95,9 +96,14 @@ def get_request_embedding(text: str) -> list[float] | None:
     payload = {"input": text}
 
     resp = requests.post(url, headers=headers, json=payload, timeout=30)
+    if resp.status_code == 404:
+        v1_url = base_url + "/openai/v1/embeddings"
+        v1_payload = {"input": text, "model": EMBEDDING_DEPLOYMENT}
+        resp = requests.post(v1_url, headers=headers, json=v1_payload, timeout=30)
+
     resp.raise_for_status()
     data = resp.json()
-    # Expecting Azure OpenAI style response: {"data":[{"embedding": [...]}, ...]}
+    # Expecting response shape: {"data":[{"embedding": [...]}, ...]}
     embedding = data.get("data", [{}])[0].get("embedding")
     return embedding
 
