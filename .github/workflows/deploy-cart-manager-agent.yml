@@ -26,7 +26,18 @@ jobs:
             exit 1
           fi
           printf "%s\n" "$ENV" > src/.env
-          grep -v '^[[:space:]]*#' src/.env | grep -v '^[[:space:]]*$' >> "$GITHUB_ENV"
+          while IFS='=' read -r key raw_value; do
+            key="$(echo "$key" | xargs)"
+            if [ -z "$key" ] || [[ "$key" == \#* ]]; then
+              continue
+            fi
+            value="$raw_value"
+            value="${value#\"}"
+            value="${value%\"}"
+            value="${value#\'}"
+            value="${value%\'}"
+            echo "$key=$value" >> "$GITHUB_ENV"
+          done < src/.env
         shell: bash
         env:
           ENV: ${{ secrets.ENV }}
